@@ -1,22 +1,27 @@
+#include <array>
 #include <iostream>
 #include <filesystem>
+#include <shared_mutex>
+#include <fstream>
 
 #include <windows.h>
 #include <stdio.h>
 #include <conio.h>
 #include <tchar.h>
 
-#define BUF_SIZE 256
-TCHAR szName[] = TEXT("CopyToolFileMappingObject");
+#include "ThreadSafeQueue.h"
 
-#define MAX_MAPPING_OBJECT_USERS 8  // each of reader and writer are counting
+#define MAX_MAPPING_OBJECT_USERS 4  // each of reader and writer are counting
 #define MAX_MAPPING_BUFFERS MAX_MAPPING_OBJECT_USERS / 2
 #define MAX_PATH_LENGTH 128
 #define USER_BUFFER_SIZE 512
+#define CHUNK_SIZE 32
 
 #define ERROR_USAGE -1
 #define ERROR_SRC -2
 #define ERROR_DST -3
+
+#define IDX_INVALID -1
 
 enum UserStatus
 {
@@ -30,24 +35,33 @@ struct MappingFileBuffStructure
     char vctBuff[USER_BUFFER_SIZE];
 };
 
-struct MappingFileUserStructure
+class MappingFileUserStructure
 {
+public:
     unsigned int nUserIdx;
-    int nPairIdx;
-    unsigned int nBuffIdx;
+    unsigned int nPairIdx = IDX_INVALID;
+    unsigned int nBuffIdx = IDX_INVALID;
     //UserStatus oStatus = UserStatus::Free;  // could be determinated from user resources indexes
     // nBuffIdx and nPairIdx not set - UserStatus::Free
     // nBuffIdx set and nPairIdx not set - UserStatus::Waiting
     // nBuffIdx and nPairIdx set - UserStatus::Working
-    char strSrcFilePath[MAX_PATH_LENGTH];
-    char strDstFilePath[MAX_PATH_LENGTH];
+    std::string strSrcFilePath;
+    //char strSrcFilePath[MAX_PATH_LENGTH];
+    std::string strDstFilePath;
+    //char strDstFilePath[MAX_PATH_LENGTH];
+};
+
+struct MappingFileBufferData
+{
+    bool completed;
+    ThreadSafeQueue<std::pair<std::array<char, CHUNK_SIZE>, size_t>, USER_BUFFER_SIZE / CHUNK_SIZE> buffer;
 };
 
 struct MappingFileAdminStructure
 {
     unsigned int nActiveUsers;
-    MappingFileUserStructure vctUsersInfo[MAX_MAPPING_OBJECT_USERS];
-    MappingFileBuffStructure vctBuffers[MAX_MAPPING_BUFFERS];
+    MappingFileUserStructure vctUserInfo[MAX_MAPPING_OBJECT_USERS];
+    MappingFileBufferData vctBufferData[MAX_MAPPING_BUFFERS];
 };
 
 #define FILE_SIZE sizeof(MappingFileAdminStructure)
@@ -68,7 +82,7 @@ DWORD try_OpenFileMapping(HANDLE* hMapFile, LPCTSTR szFileName)
     return ERROR_SUCCESS;
 }
 
-DWORD try_CreateFileMapping(void** hMapFile, LPCTSTR szFileName)
+DWORD try_CreateFileMapping(HANDLE* hMapFile, LPCTSTR szFileName)
 {
     *hMapFile = CreateFileMapping(
         INVALID_HANDLE_VALUE,    // use paging file
@@ -86,7 +100,7 @@ DWORD try_CreateFileMapping(void** hMapFile, LPCTSTR szFileName)
     return ERROR_SUCCESS;
 }
 
-DWORD try_MapViewOfFile(HANDLE hMapFile, void** pBuf)
+DWORD try_MapViewOfFile(HANDLE hMapFile, HANDLE* pBuf)
 {
     *pBuf = MapViewOfFile(hMapFile,   // handle to map object
         FILE_MAP_ALL_ACCESS, // read/write permission
@@ -104,33 +118,27 @@ DWORD try_MapViewOfFile(HANDLE hMapFile, void** pBuf)
 
 int main(int argc, char* argv[])
 {
-    if (argc < 4)
-    {
-        std::cout << "Usage: \n"
-            << "\t MultiprocessCopyTool.exe source destination mapping_object\n";
-        return ERROR_USAGE;
-    }
+    //if (argc < 4)
+    //{
+    //    std::cout << "Usage: \n"
+    //        << "\t MultiprocessCopyTool.exe source destination mapping_object_name\n";
+    //    return ERROR_USAGE;
+    //}
 
-    const std::string strSrcPath(argv[1]);
-    const std::string strDstPath(argv[2]);
+    //const std::string strSrcPath(argv[1]);
+    //const std::string strDstPath(argv[2]);
 
     WCHAR sMappObj[512];
-    swprintf(sMappObj, 512, L"%S", argv[3]);
+    swprintf(sMappObj, 512, L"%S", "Mapp");
+    //swprintf(sMappObj, 512, L"%S", argv[3]);
+    WCHAR sMutexName[512];
+    swprintf(sMutexName, 512, L"Mutex_%S", argv[3]);
 
-    if (!std::filesystem::exists(strSrcPath))
+    /*if (!std::filesystem::exists(strSrcPath))
     {
         std::cout << "Source file doesn't found\n";
         return ERROR_SRC;
-    }
-
-    if (std::filesystem::exists(strDstPath))
-    {
-        std::cout << "Destination file \"" << strDstPath << "\" already exists! Do you want to overwrite it?\n Y/N\n";
-        char cOverwrite = 'n';
-        std::cin >> cOverwrite;
-        if (std::tolower(cOverwrite) != 'y')
-            return ERROR_DST;
-    }
+    }*/
 
     HANDLE hMapFile;
     void* pBuf;
@@ -153,6 +161,17 @@ int main(int argc, char* argv[])
 
         MappingFileAdminStructure* pAdmin = (MappingFileAdminStructure*)pBuf;
 
+        //std::ofstream output(strDstPath.c_str(), std::ios::binary | std::ios::trunc);
+
+        //while (!pAdmin->vctBufferData[0].completed || !pAdmin->vctBufferData[0].buffer.empty())
+        //{
+        //    if (!pAdmin->vctBufferData[0].completed && pAdmin->vctBufferData[0].buffer.empty()) continue;
+        //    auto buffData = pAdmin->vctBufferData[0].buffer.popFront();
+        //    output.write(buffData.first.data(), buffData.second);
+        //}
+
+        //std::cout << "Writing completed\n";
+
         std::cout << "Reader " << pAdmin->nActiveUsers << std::endl;
 
         if (MAX_MAPPING_OBJECT_USERS < pAdmin->nActiveUsers)
@@ -160,10 +179,16 @@ int main(int argc, char* argv[])
             pAdmin->nActiveUsers += 1;
         }
 
-        (void)_getch();
+        //if (!pAdmin->vctUserInfo[0].mutex.try_lock())
+        //    std::cout << "Waiting" << std::endl;
+
+        //(void)_getch();
+        std::cout << "Waiting\n";
+        HANDLE mutexHandle = CreateMutex(NULL, TRUE, sMutexName);
+        WaitForSingleObject(mutexHandle, INFINITE);
+        std::cout << "Finished\n";
 
         UnmapViewOfFile(pBuf);
-        CloseHandle(hMapFile);
     }
     else if (ERROR_FILE_NOT_FOUND == uError)
     {
@@ -188,21 +213,68 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        MappingFileAdminStructure* pAdmin = new (pBuf) MappingFileAdminStructure();
+        //MappingFileAdminStructure* pAdmin = new (pBuf) MappingFileAdminStructure();
+        MappingFileAdminStructure* pAdmin = (MappingFileAdminStructure*)pBuf;
 
         std::cout << "Writer " << pAdmin->nActiveUsers << std::endl;
+        HANDLE mutexHandle = CreateMutex(NULL, TRUE, sMutexName);
+
+        if (NULL == mutexHandle)
+        {
+            _tprintf(TEXT("Could not create mutex (%d).\n"), GetLastError());
+            return 1;
+        }
 
         if (MAX_MAPPING_OBJECT_USERS > pAdmin->nActiveUsers)
         {
             pAdmin->nActiveUsers += 1;
         }
-
         (void)_getch();
+        //SignalObjectAndWait(mutexHandle, NULL, INFINITE, TRUE);
+        ReleaseMutex(mutexHandle);
+
+        //pAdmin->vctUserInfo[0].strSrcFilePath = strSrcPath;
+        //pAdmin->vctUserInfo[0].strDstFilePath = strDstPath;
+
+        //if (!std::filesystem::exists(strSrcPath))
+        //{
+        //    std::cout << "Source file doesn't found\n";
+        //    return ERROR_SRC;
+        //}
+
+        //if (std::filesystem::exists(strDstPath))
+        //{
+        //    std::cout << "Destination file \"" << strDstPath << "\" already exists! Do you want to overwrite it?\n Y/N\n";
+        //    char cOverwrite = 'n';
+        //    std::cin >> cOverwrite;
+        //    if (std::tolower(cOverwrite) != 'y')
+        //        return ERROR_DST;
+        //}
+
+        //std::ifstream input(strSrcPath.c_str(), std::ios::binary);
+
+        //std::array<char, CHUNK_SIZE> vctBuffer;
+
+        //auto rdBuf = input.rdbuf();
+        //size_t nSize = 0;
+        //(void)_getch();
+
+        //while ((nSize = rdBuf->sgetn(vctBuffer.data(), vctBuffer.size())) && nSize)
+        //{
+        //    pAdmin->vctBufferData[0].buffer.pushBack({vctBuffer, nSize});
+        //}
+
+        //pAdmin->vctBufferData[0].completed = true;
+
+        //std::cout << "Reading completed\n";
+
+        //pAdmin->vctUserInfo[0].mutex.lock();
+
 
         UnmapViewOfFile(pBuf);
-        CloseHandle(hMapFile);
     }
 
+    CloseHandle(hMapFile);
 
     return 0;
 }
