@@ -133,17 +133,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Actor.cpp" />
-    <ClCompile Include="Administrator.cpp" />
-    <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Actor.h" />
     <ClInclude Include="Administrator.h" />
     <ClInclude Include="Buffer.h" />
-    <ClInclude Include="Constants.h" />
-    <ClInclude Include="ThreadSafeQueue.h" />
+    <ClInclude Include="Globals.h" />
+    <ClInclude Include="IPCConditionalVariable.h" />
+    <ClInclude Include="IPCMutex.h" />
+    <ClInclude Include="IPCScopedLock.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Actor.inl" />
+    <None Include="Administrator.inl" />
+    <None Include="Buffer.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
