@@ -4,17 +4,9 @@
 class IPCScopedLock
 {
 public:
-	IPCScopedLock(IPCMutex& mutex)
-		: m_mutex(mutex)
-	{
-		m_mutex.Lock();
-	}
-
-	~IPCScopedLock()
-	{
-		m_mutex.Unlock();
-	}
+	IPCScopedLock(IPCMutex* mutex);
+	~IPCScopedLock();
 
 private:
-	IPCMutex& m_mutex;
+	IPCMutex* m_mutex;
 };

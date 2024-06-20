@@ -1,16 +1,10 @@
 #pragma once
 #include <windows.h>
 
-#include <array>
-#include <string>
-
 #include "Globals.h"
 #include "IPCMutex.h"
 
-template<typename T, size_t N>
 class Actor;
-template<typename T, size_t N>
-class Buffer;
 
 struct FileAdminSector
 {
@@ -18,17 +12,14 @@ struct FileAdminSector
 	std::array<bool, MAX_MAPPING_BUFFERS> bufferAvailablePool;
 };
 
-template<typename T, size_t N>
 class Administrator
 {
 public:
 	bool Init(const char* szFileName);
 
-	void Run();
-
-	Actor<T, N>* CreateActor(const char strSrcPath[MAX_PATH_LENGTH], const char strDstPath[MAX_PATH_LENGTH]);
-	Actor<T, N>* GetActorPtr(size_t nActorId) const;
-	Buffer<T, N>* GetBufferPtr(size_t nBufferId) const;
+	Actor* CreateActor(const char strSrcPath[MAX_PATH_LENGTH], const char strDstPath[MAX_PATH_LENGTH]);
+	Actor* GetActorPtr(size_t nActorId) const;
+	BufferType* GetBufferPtr(size_t nBufferId) const;
 
 private:
 	static size_t GetNumOfActiveUsers(FileAdminSector* pAdminSector);
@@ -39,14 +30,12 @@ private:
 	static size_t GetAddressForBuffer(size_t nBufferIdx);
 
 private:
-	bool m_bInitialized;
-	bool m_bRunning;
+	bool m_bInitialized = false;
+	bool m_bRunning = false;
 
-	const char* m_szFileName;
-	HANDLE m_fileHandle;
-	HANDLE m_buffHandle;
+	const char* m_szFileName = nullptr;
+	HANDLE m_fileHandle = nullptr;
+	HANDLE m_buffHandle = nullptr;
 
 	mutable IPCMutex m_mutex;
 };
-
-#include "Administrator.inl"

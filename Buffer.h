@@ -5,10 +5,8 @@
 #include <array>
 
 #include "IPCMutex.h"
+#include "IPCSemaphore.h"
 #include "IPCConditionalVariable.h"
-
-template<typename T, size_t N>
-class Actor;
 
 template<typename T, size_t N>
 class Buffer
@@ -17,7 +15,7 @@ public:
 	Buffer(size_t nIdx);
 	~Buffer() = default;
 
-	void Init(const char* szFileName);
+	void Init(const char* szFileName, bool bReading);
 
 	size_t GetId() const;
 

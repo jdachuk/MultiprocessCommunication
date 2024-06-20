@@ -75,6 +75,10 @@
     <OutDir>$(SolutionDir)build\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)build\$(Configuration)\$(Platform)\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)build\$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)build\$(Configuration)\$(Platform)\</IntDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -124,6 +128,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +138,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Administrator.cpp" />
+    <ClCompile Include="Actor.cpp" />
+    <ClCompile Include="IPCConditionalVariable.cpp" />
+    <ClCompile Include="IPCMutex.cpp" />
+    <ClCompile Include="IPCScopedLock.cpp" />
+    <ClCompile Include="IPCSemaphore.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -143,10 +154,9 @@
     <ClInclude Include="IPCConditionalVariable.h" />
     <ClInclude Include="IPCMutex.h" />
     <ClInclude Include="IPCScopedLock.h" />
+    <ClInclude Include="IPCSemaphore.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Actor.inl" />
-    <None Include="Administrator.inl" />
     <None Include="Buffer.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

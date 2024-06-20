@@ -1,10 +1,12 @@
 #pragma once
 
-template<typename T, size_t N>
-class Administrator;
+#include "Globals.h"
 
-template<typename T, size_t N>
-class Buffer;
+#include "IPCConditionalVariable.h"
+
+#include <string>
+
+class Administrator;
 
 enum Role
 {
@@ -12,14 +14,13 @@ enum Role
 	Writer,
 };
 
-template<typename T, size_t N>
 class Actor
 {
 public:
 	Actor(const char* strSrcPath, const char* strDstPath, size_t nId, Role eRole);
 	~Actor() = default;
 
-	void Init(Administrator<T, N>* pAdministrator);
+	void Init(Administrator* pAdministrator, BufferType* pBuffer, const char* szFileName);
 	void Start();
 
 	std::string GetSrcPath() const;
@@ -27,6 +28,7 @@ public:
 	size_t GetId() const;
 	Role GetRole() const;
 	bool Finished() const;
+	bool Ready() const;
 
 	void SetBufferId(size_t nBufferId);
 	size_t GetBufferId() const;
@@ -41,9 +43,10 @@ private:
 	size_t m_nBufferId;
 	Role m_eRole;
 	bool m_bFinished;
+	bool m_bReady;
 
-	Administrator<T, N>* m_pAdministrator;
-	Buffer<T, N>* m_pBuffer;
+	IPCConditionalVariable m_condition;
+
+	Administrator* m_pAdministrator;
+	BufferType* m_pBuffer;
 };
-
-#include "Actor.inl"

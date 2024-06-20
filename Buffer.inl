@@ -20,18 +20,18 @@ Buffer<T, N>::Buffer(size_t nIdx)
 }
 
 template<typename T, size_t N>
-inline void Buffer<T, N>::Init(const char* szFileName)
+inline void Buffer<T, N>::Init(const char* szFileName, bool bReading)
 {
 	char sMutexName[256];
 
-	sprintf_s(sMutexName, sizeof(sMutexName) / sizeof(char), "Mutex_%s_%zu", szFileName, m_nId);
+	sprintf_s(sMutexName, sizeof(sMutexName) / sizeof(char), "Local\\Mutex_%s_%zu", szFileName, m_nId);
 	m_mutex.Init(sMutexName);
 
 	sprintf_s(sMutexName, sizeof(sMutexName) / sizeof(char), "ConditionRead_%s_%zu", szFileName, m_nId);
-	m_cvRead.Init(sMutexName);
+	m_cvRead.Init(sMutexName, bReading);
 
 	sprintf_s(sMutexName, sizeof(sMutexName) / sizeof(char), "ConditionWrite_%s_%zu", szFileName, m_nId);
-	m_cvWrite.Init(sMutexName);
+	m_cvWrite.Init(sMutexName, !bReading);
 }
 
 template<typename T, size_t N>
@@ -67,40 +67,54 @@ inline size_t Buffer<T, N>::GetWriterId() const
 template<typename T, size_t N>
 bool Buffer<T, N>::Empty() const
 {
-	IPCScopedLock lk(m_mutex);
+	IPCScopedLock lk(&m_mutex);
 
-	return (0 == m_nSize - m_nDeletions);
+	return (m_nDeletions >= m_nSize);
 }
 
 template<typename T, size_t N>
 bool Buffer<T, N>::Full() const
 {
-	IPCScopedLock lk(m_mutex);
+	IPCScopedLock lk(&m_mutex);
 
-	return (N == m_nSize - m_nDeletions);
+	return (N <= m_nSize - m_nDeletions);
 }
 
 template<typename T, size_t N>
 void Buffer<T, N>::Push(T&& item)
 {
-	if (Full()) m_cvWrite.Wait([&]() { return !Full(); });
-	IPCScopedLock lk(m_mutex);
+	if (Full()) 
+	{
+		std::cout << "Push waiting for signal\n";
+		m_cvWrite.Wait(1000);
+	}
+	std::cout << "Push got signal\n";
+	IPCScopedLock lk(&m_mutex);
+	//m_mutex.Lock();
 
 	m_queue[LastIdx()] = item;
 	m_nSize += 1;
 
+	//m_mutex.Unlock();
 	m_cvRead.NotifyOne();
 }
 
 template<typename T, size_t N>
 T Buffer<T, N>::Pop()
 {
-	if (Empty()) m_cvRead.Wait([&]() { return !Empty(); });
-	IPCScopedLock lk(m_mutex);
+	if (Empty()) 
+	{
+		std::cout << "Pop waiting for signal\n";
+		m_cvRead.Wait(1000);
+	}
+	std::cout << "Pop got signal\n";
+	IPCScopedLock lk(&m_mutex);
+	//m_mutex.Lock();
 
 	T item = m_queue[FirstIdx()];
 	m_nDeletions += 1;
 
+	//m_mutex.Unlock();
 	m_cvWrite.NotifyOne();
 
 	return item;
@@ -114,7 +128,7 @@ void Buffer<T, N>::Clear()
 template<typename T, size_t N>
 inline size_t Buffer<T, N>::Size() const
 {
-	IPCScopedLock lk(m_mutex);
+	IPCScopedLock lk(&m_mutex);
 
 	return m_nSize - m_nDeletions;
 }
