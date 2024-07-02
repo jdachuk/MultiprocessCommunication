@@ -138,26 +138,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ActorData.cpp" />
     <ClCompile Include="Administrator.cpp" />
     <ClCompile Include="Actor.cpp" />
-    <ClCompile Include="IPCConditionalVariable.cpp" />
+    <ClCompile Include="IPCEvent.cpp" />
+    <ClCompile Include="IPCMap.cpp" />
     <ClCompile Include="IPCMutex.cpp" />
-    <ClCompile Include="IPCScopedLock.cpp" />
-    <ClCompile Include="IPCSemaphore.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Actor.h" />
+    <ClInclude Include="ActorData.h" />
     <ClInclude Include="Administrator.h" />
-    <ClInclude Include="Buffer.h" />
+    <ClInclude Include="FixedSizeQueue.h" />
     <ClInclude Include="Globals.h" />
-    <ClInclude Include="IPCConditionalVariable.h" />
+    <ClInclude Include="IPCEvent.h" />
+    <ClInclude Include="IPCMap.h" />
     <ClInclude Include="IPCMutex.h" />
-    <ClInclude Include="IPCScopedLock.h" />
-    <ClInclude Include="IPCSemaphore.h" />
+    <ClInclude Include="IPCSafeQueueManager.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Buffer.inl" />
+    <None Include="FixedSizeQueue.inl" />
+    <None Include="IPCSafeQueueManager.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

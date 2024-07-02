@@ -1,142 +1,83 @@
 #include "Actor.h"
 
-#include "Buffer.h"
-#include "Administrator.h"
-
-#include "IPCScopedLock.h"
+#include "FixedSizeQueue.h"
+#include "IPCEvent.h"
+#include "IPCMutex.h"
+#include "IPCMap.h"
+#include "IPCSafeQueueManager.h"
 
 #include <fstream>
-#include <thread>
+#include <mutex>
 
-#include <iostream>
-
-Actor::Actor(const char* strSrcPath, const char* strDstPath, size_t nId, Role eRole)
-	: m_nId(nId)
-	, m_nBufferId(IDX_INVALID)
-	, m_eRole(eRole)
-	, m_bFinished(false)
-	, m_pAdministrator(nullptr)
-	, m_pBuffer(nullptr)
+Actor::Actor(const ActorData& data)
+	: m_ActorData(data)
+	, m_MapFile(nullptr)
+	, m_WriterFoundEvent(nullptr)
+	, m_ReaderFinishedEvent(nullptr)
+	, m_QueueManager(nullptr)
 {
-	memset(m_strSrcPath, 0, MAX_PATH_LENGTH);
-	memset(m_strDstPath, 0, MAX_PATH_LENGTH);
-	memcpy(m_strSrcPath, strSrcPath, MAX_PATH_LENGTH);
-	memcpy(m_strDstPath, strDstPath, MAX_PATH_LENGTH);
-}
+	const std::size_t actorHash = std::hash<ActorData>{}(m_ActorData);
 
-void Actor::Init(Administrator* pAdministrator, BufferType* pBuffer, const char* szFileName)
-{
+	char fileName[MAX_PATH];
+	char writerFoundEvent[MAX_PATH];
+	char readerFinishedEvent[MAX_PATH];
+	sprintf_s(fileName, "ActorMap_%s", std::to_string(actorHash).c_str());
+	sprintf_s(writerFoundEvent, "WriterFoundEvent_%s", std::to_string(actorHash).c_str());
+	sprintf_s(readerFinishedEvent, "ReaderFinishedEvent_%s", std::to_string(actorHash).c_str());
 
-	char sMutexName[256];
-
-	m_pAdministrator = pAdministrator;
-	m_pBuffer = pBuffer;
-
-	if (nullptr == m_pBuffer) return;
-
-	m_nBufferId = m_pBuffer->GetId();
-
-	sprintf_s(sMutexName, sizeof(sMutexName) / sizeof(char), "ActorCondition_%s_%zu", szFileName, m_nBufferId);
-	m_condition.Init(sMutexName, Role::Writer == m_eRole);
-
-	if (Role::Reader == m_eRole)
-		m_pBuffer->SetReaderId(m_nId);
-	else
-		m_pBuffer->SetWriterId(m_nId);
+	m_MapFile = std::make_unique<IPCMap>(sizeof(FixedSizeQueue<ChunkInfoType, MAX_CHUNKS>), fileName);
+	m_WriterFoundEvent = std::make_unique<IPCEvent>(writerFoundEvent);
+	m_ReaderFinishedEvent = std::make_unique<IPCEvent>(readerFinishedEvent);
+	m_QueueManager = std::make_unique<IPCSafeQueueManager<ChunkInfoType, MAX_CHUNKS>>(
+		static_cast<FixedSizeQueue<ChunkInfoType, MAX_CHUNKS>*>(m_MapFile->GetHandle()), m_ActorData);
 }
 
 void Actor::Start()
 {
-	if (Role::Reader == m_eRole)
-		Read();
+	if (m_MapFile->IsCreated())
+	{
+		ReadFile();
+	}
 	else
-		Write();
+	{
+		WriteFile();
+	}
 }
 
-std::string Actor::GetSrcPath() const
+void Actor::ReadFile()
 {
-	return m_strSrcPath;
-}
+	if (WAIT_TIMEOUT == m_WriterFoundEvent->Wait(5000))
+	{
+		return;
+	}
 
-std::string Actor::GetDstPath() const
-{
-	return m_strDstPath;
-}
-
-size_t Actor::GetId() const
-{
-	return m_nId;
-}
-
-Role Actor::GetRole() const
-{
-	return m_eRole;
-}
-
-bool Actor::Finished() const
-{
-	return m_bFinished;
-}
-
-bool Actor::Ready() const
-{
-	return m_bReady;
-}
-
-void Actor::SetBufferId(size_t nBufferId)
-{
-	m_nBufferId = nBufferId;
-}
-
-size_t Actor::GetBufferId() const
-{
-	return m_nBufferId;
-}
-
-void Actor::Read()
-{
-	std::cout << "Read\n";
-	std::ifstream input(m_strSrcPath, std::ios::binary);
+	std::ifstream input(m_ActorData.SrcPath, std::ios::binary);
 
 	auto rdBuf = input.rdbuf();
 	size_t nSize = 0;
 
 	ChunkType chunk;
 
-	DWORD rt = m_condition.Wait(5000);
-
-	if (WAIT_TIMEOUT == rt)
+	while ((nSize = rdBuf->sgetn(chunk.data(), chunk.size())) && nSize)
 	{
-		m_bFinished = true;
-		std::cout << "Timed Out!\n";
-		return;
+		m_QueueManager->Push({ chunk, nSize });
 	}
 
-	while (!m_bFinished)
-	{
-		m_bFinished = !((nSize = rdBuf->sgetn(chunk.data(), chunk.size())) && nSize);
-		std::cout << "Read " << chunk.data() << std::endl;
-		m_pBuffer->Push({chunk, nSize});
-	}
-	std::cout << "Finished Read\n";
+	m_ReaderFinishedEvent->Notify();
 }
 
-void Actor::Write()
+void Actor::WriteFile()
 {
-	std::ofstream output(m_strDstPath, std::ios::binary | std::ios::trunc);
+	m_WriterFoundEvent->Notify();
 
-	size_t nReaderId = m_pBuffer->GetReaderId();
-	Actor* pReader = m_pAdministrator->GetActorPtr(nReaderId);
+	std::ofstream output(m_ActorData.DstPath, std::ios::binary | std::ios::trunc);
 
-	m_condition.NotifyOne();
-	std::cout << "Write\n";
+	bool readerFinished = false;
 
-	while (!(pReader->Finished() && m_pBuffer->Empty()))
+	while ((readerFinished = (ERROR_SUCCESS == m_ReaderFinishedEvent->Wait(0)) && !readerFinished) || !m_QueueManager->Empty())
 	{
-		auto buffData = m_pBuffer->Pop();
-		std::cout << "Write " << buffData.first.data() << std::endl;
+		if (!readerFinished && m_QueueManager->Empty()) continue;
+		auto buffData = m_QueueManager->Pop();
 		output.write(buffData.first.data(), buffData.second);
 	}
-	std::cout << "Finished Write\n";
-	m_bFinished = true;
 }

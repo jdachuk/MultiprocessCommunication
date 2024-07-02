@@ -1,37 +1,31 @@
 #include "IPCMutex.h"
 
-#include <iostream>
+#include <exception>
 
-IPCMutex::IPCMutex()
-	: m_handle(nullptr)
-{}
+IPCMutex::IPCMutex(const std::string& name)
+{
+	char mutexName[MAX_PATH];
+	sprintf_s(mutexName, "Mutex_%s", name.data());
+
+	m_handle = CreateMutexExA(nullptr, mutexName, 0, MUTEX_ALL_ACCESS | MUTEX_MODIFY_STATE);
+	if (nullptr == m_handle)
+	{
+		throw std::exception("Couldn't create mutex.");
+	}
+}
 
 IPCMutex::~IPCMutex()
 {
-	//ReleaseMutex(m_handle);
+	ReleaseMutex(m_handle);
 	CloseHandle(m_handle);
 }
 
-void IPCMutex::Init(const char* sName)
+void IPCMutex::lock()
 {
-	m_handle = OpenMutexA(MUTEX_ALL_ACCESS | MUTEX_MODIFY_STATE, TRUE, sName);
-	if (NULL == m_handle && ERROR_FILE_NOT_FOUND == GetLastError())
-		m_handle = CreateMutexExA(NULL, sName, 0, MUTEX_ALL_ACCESS | MUTEX_MODIFY_STATE);
-
-	std::cout << "Mutex " << m_handle << " " << sName << " " << GetLastError() << std::endl;
+	WaitForSingleObject(m_handle, INFINITE);
 }
 
-void IPCMutex::Lock()
-{
-	WaitForSingleObjectEx(m_handle, INFINITE, FALSE);
-}
-
-void IPCMutex::Unlock()
+void IPCMutex::unlock()
 {
 	ReleaseMutex(m_handle);
-}
-
-HANDLE IPCMutex::GetHandle()
-{
-	return m_handle;
 }

@@ -24,16 +24,16 @@
     <ClCompile Include="Actor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="IPCConditionalVariable.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="IPCMutex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="IPCScopedLock.cpp">
+    <ClCompile Include="ActorData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="IPCSemaphore.cpp">
+    <ClCompile Include="IPCEvent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="IPCMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -47,24 +47,30 @@
     <ClInclude Include="Actor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Buffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="IPCMutex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IPCConditionalVariable.h">
+    <ClInclude Include="ActorData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IPCScopedLock.h">
+    <ClInclude Include="FixedSizeQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IPCSemaphore.h">
+    <ClInclude Include="IPCEvent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IPCMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IPCSafeQueueManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Buffer.inl">
+    <None Include="FixedSizeQueue.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="IPCSafeQueueManager.inl">
       <Filter>Header Files</Filter>
     </None>
   </ItemGroup>
