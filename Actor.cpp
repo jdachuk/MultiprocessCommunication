@@ -46,7 +46,7 @@ void Actor::Start()
 
 void Actor::ReadFile()
 {
-	if (WAIT_TIMEOUT == m_WriterFoundEvent->Wait(5000))
+	if (WAIT_TIMEOUT == m_WriterFoundEvent->Wait())
 	{
 		return;
 	}
@@ -73,11 +73,11 @@ void Actor::WriteFile()
 	std::ofstream output(m_ActorData.DstPath, std::ios::binary | std::ios::trunc);
 
 	bool readerFinished = false;
-
-	while ((readerFinished = (ERROR_SUCCESS == m_ReaderFinishedEvent->Wait(0)) && !readerFinished) || !m_QueueManager->Empty())
+	do
 	{
-		if (!readerFinished && m_QueueManager->Empty()) continue;
 		auto buffData = m_QueueManager->Pop();
 		output.write(buffData.first.data(), buffData.second);
-	}
+		const auto waitResult = m_ReaderFinishedEvent->Wait(0);
+		readerFinished |= WAIT_OBJECT_0 == waitResult;
+	} while (!readerFinished || !m_QueueManager->Empty());
 }

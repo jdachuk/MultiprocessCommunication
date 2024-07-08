@@ -44,23 +44,39 @@ inline bool IPCSafeQueueManager<T, N>::Full() const
 template<typename T, int N>
 inline void IPCSafeQueueManager<T, N>::Push(T&& item)
 {
-	if (Full()) m_WriteEvent->Wait();
+	while (true)
+	{
+		{
+			std::scoped_lock<IPCMutex> lk(*m_Mutex.get());
+			if (!m_Queue->Full())
+			{
+				m_Queue->Push(std::move(item));
 
-	std::scoped_lock<IPCMutex> lk(*m_Mutex.get());
-	m_Queue->Push(std::move(item));
+				m_ReadEvent->Notify();
 
-	m_ReadEvent->Notify();
+				return;
+			}
+		}
+		m_WriteEvent->Wait();
+	}
 }
 
 template<typename T, int N>
 inline T IPCSafeQueueManager<T, N>::Pop()
 {
-	if (Empty()) m_ReadEvent->Wait();
+	while (true)
+	{
+		{
+			std::scoped_lock<IPCMutex> lk(*m_Mutex.get());
+			if (!m_Queue->Empty())
+			{
+				T item{ std::move(m_Queue->Pop()) };
 
-	std::scoped_lock<IPCMutex> lk(*m_Mutex.get());
-	T item{ std::move(m_Queue->Pop()) };
+				m_WriteEvent->Notify();
 
-	m_WriteEvent->Notify();
-
-	return item;
+				return item;
+			}
+		}
+		m_ReadEvent->Wait();
+	}
 }
