@@ -1,19 +1,20 @@
 #pragma once
-#include <windows.h>
+
+#include <Windows.h>
+
+#include <string>
+#include <memory>
 
 class IPCMutex
 {
 public:
-	IPCMutex();
+	IPCMutex(const std::string& name);
 	~IPCMutex();
 
-	void Init(const char* sName);
-
-	void Lock();
-	void Unlock();
-
-	HANDLE GetHandle();
+	void lock();
+	void unlock();
 
 private:
 	HANDLE m_handle;
 };
+
